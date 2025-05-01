@@ -5,87 +5,102 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.metrics import accuracy_score, confusion_matrix
 
-# Загрузка данных
-df_train = pd.read_csv("train.csv")
-df_test = pd.read_csv("test.csv")
+# Загрузка наборов данных
+train_df = pd.read_csv("train.csv")
+test_df = pd.read_csv("test.csv")
 
-print("Вывод первых строк Датасета:")
-print(df_train.head())
-print('Вывод кол-ва пропущенных значений и их тип: ')
-print(df_train.info())
+print("Первые строки обучающего набора:")
+print(train_df.head())
+print("Информация о наборе данных (пропуски, типы):")
+print(train_df.info())
 
-# Предобработка данных
-def preprocess_data(df):
-    df = df.drop(columns=['PassengerId', 'Name', 'Cabin'])  # Удаляем ненужные столбцы
-    df['CryoSleep'] = df['CryoSleep'].map({True: 1, False: 0})  # Преобразуем в числовой формат
+def preprocess_dataframe(df):
+    """
+    Функция предобработки данных:
+    - Удаляются столбцы, не влияющие на модель.
+    - Логические переменные преобразуются в числовой формат.
+    - Применяется one-hot кодирование для категориальных признаков.
+    - Заполняются пропуски в числовых признаках средним значением.
+    """
+    # Исключаем ненужные признаки
+    df = df.drop(columns=['PassengerId', 'Name', 'Cabin'])
+    # Преобразование булевых признаков
+    df['CryoSleep'] = df['CryoSleep'].map({True: 1, False: 0})
     df['VIP'] = df['VIP'].map({True: 1, False: 0})
-    df = pd.get_dummies(df, columns=['HomePlanet', 'Destination'])  # Кодируем категориальные признаки
-    df.fillna(df.select_dtypes(include=[np.number]).mean(), inplace=True)  # Заполняем только числовые пропуски
+    # Кодирование категориальных переменных
+    df = pd.get_dummies(df, columns=['HomePlanet', 'Destination'])
+    # Заполнение пропусков для числовых столбцов
+    df.fillna(df.select_dtypes(include=[np.number]).mean(), inplace=True)
     return df
 
-df_train = preprocess_data(df_train)
-df_test = preprocess_data(df_test)
+# Применяем предобработку к обучающему и тестовому набору
+train_df = preprocess_dataframe(train_df)
+test_df = preprocess_dataframe(test_df)
 
-# Разделение данных на X и y
-X = df_train.drop(columns=['Transported']) # тренировочная выборка
-y = df_train['Transported'].astype(int) # Тестовая переменная
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Разделение признаков и целевой переменной
+features = train_df.drop(columns=['Transported'])
+target = train_df['Transported'].astype(int)
 
-# Масштабирование данных
-scaler = StandardScaler()
-X_train = scaler.fit_transform(X_train) # для того чтобы среднее=0, а стандартное отклонение 1
-X_test = scaler.transform(X_test)
+# Разбиваем данные на обучающую и валидационную выборки
+feat_train, feat_val, target_train, target_val = train_test_split(
+    features, target, test_size=0.2, random_state=42
+)
 
-# Логистическая регрессия
-log_reg = LogisticRegression(max_iter=500)
-log_reg.fit(X_train, y_train)
-y_pred_log = log_reg.predict(X_test)
+# Масштабирование признаков
+data_scaler = StandardScaler()
+feat_train = data_scaler.fit_transform(feat_train)
+feat_val = data_scaler.transform(feat_val)
 
-# Линейная регрессия
-lin_reg = LinearRegression()
-lin_reg.fit(X_train, y_train)
-y_pred_lin = (lin_reg.predict(X_test) > 0.5).astype(int)  # Преобразуем в бинарный формат
+# Обучение модели логистической регрессии
+log_regressor = LogisticRegression(max_iter=500)
+log_regressor.fit(feat_train, target_train)
+pred_logistic = log_regressor.predict(feat_val)
 
+# Обучение модели линейной регрессии
+lin_regressor = LinearRegression()
+lin_regressor.fit(feat_train, target_train)
+# Преобразуем предсказания в бинарный формат
+pred_linear = (lin_regressor.predict(feat_val) > 0.5).astype(int)
+
+def assess_model(actual, predicted, model_label):
+    """Функция для оценки модели по метрике Accuracy."""
+    accuracy = accuracy_score(actual, predicted)
+    print(f"{model_label}:")
+    print(f"Accuracy: {accuracy:.2f}")
 
 # Оценка моделей
-def evaluate_model(y_true, y_pred, model_name):
-    print(f"{model_name}:")
-    print(f"Accuracy: {accuracy_score(y_true, y_pred):.2f}")
+assess_model(target_val, pred_logistic, "Логистическая регрессия")
+assess_model(target_val, pred_linear, "Линейная регрессия")
 
+# Вычисление матриц ошибок
+cm_logistic = confusion_matrix(target_val, pred_logistic)
+cm_linear = confusion_matrix(target_val, pred_linear)
 
+# Визуализация матриц ошибок с помощью heatmap
+fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-evaluate_model(y_test, y_pred_log, "Логистическая регрессия")
-evaluate_model(y_test, y_pred_lin, "Линейная регрессия")
-# Матрицы ошибок
-cm_log = confusion_matrix(y_test, y_pred_log)
-cm_lin = confusion_matrix(y_test, y_pred_lin)
+sns.heatmap(cm_logistic, annot=True, fmt='d', cmap='Greens', ax=axes[0])
+axes[0].set_xlabel('Предсказано: отрицательный')
+axes[0].set_ylabel('Истинное значение')
+axes[0].set_title('Матрица ошибок: Логистическая регрессия')
 
-# Создание подграфиков
-fig, axes = plt.subplots(1, 2, figsize=(13, 5)) # 1 строка, 2 столбца
+sns.heatmap(cm_linear, annot=True, fmt='d', cmap='Reds', ax=axes[1])
+axes[1].set_xlabel('Предсказано: отрицательный')
+axes[1].set_ylabel('Истинное значение')
+axes[1].set_title('Матрица ошибок: Линейная регрессия')
 
-# Тепловая карта для логистической регрессии
-sns.heatmap(cm_log, annot=True, fmt='d', cmap='Greens', ax=axes[0])
-axes[0].set_xlabel('Ложный')
-axes[0].set_ylabel('Истинный')
-axes[0].set_title('Матрица ошибок логистической регрессии')
-
-# Тепловая карта для линейной регрессии
-sns.heatmap(cm_lin, annot=True, fmt='d', cmap='Reds', ax=axes[1])
-axes[1].set_xlabel('Ложный')
-axes[1].set_ylabel('Истинный')
-axes[1].set_title('Матрица ошибок линейной регрессии')
- # Предотвращает наложение элементов графика
+plt.tight_layout()
 plt.show()
 
-# Создание итогового DataFrame
-results_df = pd.DataFrame({
-    'Тестовая': y_test,
-    'X': y_pred_log,
-    'Y': y_pred_lin
+# Формирование итогового DataFrame с результатами
+output_df = pd.DataFrame({
+    'Истинное значение': target_val,
+    'Логистическая регрессия': pred_logistic,
+    'Линейная регрессия': pred_linear
 })
 
-# Сохранение в CSV файл
-results_df.to_csv('itog.csv', index=False)
+# Сохранение результатов в CSV файл
+output_df.to_csv('itog.csv', index=False)
 print("Итоговый CSV файл сохранен как 'itog.csv'")

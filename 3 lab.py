@@ -4,75 +4,79 @@ from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.metrics import precision_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 
-# Загрузка данных
-train_data = pd.read_csv('train.csv')
-test_data = pd.read_csv('test.csv')
+# Загрузка наборов данных
+df_train = pd.read_csv('train.csv')
+df_eval = pd.read_csv('test.csv')
 
-# Проверяем, какие столбцы есть в train_data
-print("Столбцы в df_train_data:", train_data.columns)
+# Вывод списка столбцов исходного обучающего набора
+print("Доступные столбцы в обучающем наборе:", df_train.columns)
 
-# Удаление ненужных столбцов
-train_data = train_data.drop(columns=['PassengerId', 'Name'])
-test_data = test_data.drop(columns=['PassengerId', 'Name'])
+# Удаляем столбцы, не влияющие на модель
+df_train = df_train.drop(columns=['PassengerId', 'Name'])
+df_eval = df_eval.drop(columns=['PassengerId', 'Name'])
 
-# Заполнение пропущенных числовых значений
-train_data.fillna(train_data.median(numeric_only=True), inplace=True)
-test_data.fillna(test_data.median(numeric_only=True), inplace=True)
+# Замена пропущенных числовых значений на медиану по столбцу
+df_train.fillna(df_train.median(numeric_only=True), inplace=True)
+df_eval.fillna(df_eval.median(numeric_only=True), inplace=True)
 
-# Заполнение пропущенных категориальных значений корректно
-for col in train_data.select_dtypes(include=['object']).columns:
-    train_data[col] = train_data[col].astype(str).fillna("None")
-for col in test_data.select_dtypes(include=['object']).columns:
-    test_data[col] = test_data[col].astype(str).fillna("None")
+# Обработка пропущенных категориальных данных – заполняем значением "None"
+for column in df_train.select_dtypes(include=['object']).columns:
+    df_train[column] = df_train[column].astype(str).fillna("None")
+for column in df_eval.select_dtypes(include=['object']).columns:
+    df_eval[column] = df_eval[column].astype(str).fillna("None")
 
-# Преобразование категориальных данных в числовые
-combined_data = pd.concat([train_data, test_data], axis=0)
-combined_data = pd.get_dummies(combined_data)
+# Объединяем обучающий и тестовый набор для корректного кодирования категориальных признаков
+combined_df = pd.concat([df_train, df_eval], axis=0)
+combined_df = pd.get_dummies(combined_df)
 
-# Проверяем, какие колонки получились
-print("Столбцы после one hot encoding:", combined_data.columns)
+# Выводим перечень столбцов после применения one-hot encoding
+print("Столбцы после one hot encoding:", combined_df.columns)
 
-# Используем Transported_True как целевую переменную
-if 'Transported_True' not in combined_data.columns:
-    raise KeyError(f"Колонка 'Transported_True' отсутствует. Доступные столбцы: {combined_data.columns}")
+# Проверка наличия столбца целевой переменной 'Transported_True'
+if 'Transported_True' not in combined_df.columns:
+    raise KeyError(f"Отсутствует колонка 'Transported_True'. Доступные столбцы: {combined_df.columns}")
 
-# Разделение обратно на train и test
-train_data = combined_data.iloc[:len(train_data), :]
-test_data = combined_data.iloc[len(train_data):, :]
+# Делим объединённый набор обратно на обучающую и тестовую выборки
+train_rows = len(df_train)
+df_train_processed = combined_df.iloc[:train_rows, :]
+df_eval_processed = combined_df.iloc[train_rows:, :]
 
-# Разделение признаков и целевой переменной
-X_train = train_data.drop(columns=['Transported_False', 'Transported_True'])
-y_train = train_data['Transported_True']
-X_test = test_data.drop(columns=['Transported_False', 'Transported_True'], errors='ignore')  # У test нет Transported
+# Формирование признакового пространства и целевого в обучающем наборе
+features_train = df_train_processed.drop(columns=['Transported_False', 'Transported_True'])
+target_train = df_train_processed['Transported_True']
 
-# Создание и обучение модели
-clf = DecisionTreeClassifier(random_state=42, max_depth=2)
+# Обработка тестовой выборки (если имеются столбцы, связанные с целевой переменной, они исключаются)
+features_eval = df_eval_processed.drop(columns=['Transported_False', 'Transported_True'], errors='ignore')
 
-clf.fit(X_train, y_train)
+# Создание и обучение модели решающего дерева
+decision_tree = DecisionTreeClassifier(random_state=42, max_depth=2)
+decision_tree.fit(features_train, target_train)
 
-# Прогнозирование
-y_pred = clf.predict(X_train)  # Здесь y_pred получается для train, так как в test нет истинных значений
+# Предсказание на обучающем наборе (так как для тестовой выборки истинные метки отсутствуют)
+predictions_train = decision_tree.predict(features_train)
 
-precision = precision_score(y_train, y_pred)  # Оценка на train
-print(f'Precision: {precision:.3f}')
+# Оценка точности модели по метрике Precision
+model_precision = precision_score(target_train, predictions_train)
+print(f'Precision (точность): {model_precision:.3f}')
 
-conf_matrix = confusion_matrix(y_train, y_pred)
-print('Матрица ошибок:\n', conf_matrix)
+# Вычисление матрицы ошибок для обучающего набора
+error_matrix = confusion_matrix(target_train, predictions_train)
+print('Матрица ошибок:\n', error_matrix)
 
+# Визуализация структуры дерева решений
 plt.figure(figsize=(10, 8))
-plot_tree(clf, filled=True, feature_names=X_train.columns, class_names=['False', 'True'])
+plot_tree(decision_tree, filled=True, feature_names=features_train.columns, class_names=['False', 'True'])
 plt.show()
 
 """
-CryoSleep_True <= 0.5:
-Это условие, по которому данные разделяются. 
-Если значение признака CryoSleep_True меньше или равно 0.5, 
-то образцы идут в левое поддерево; если больше — в правое.
-"""
+Комментарий:
+Условие разделения:
+    CryoSleep_True <= 0.5
+означает, что если значение признака CryoSleep_True меньше или равно 0.5, 
+то объект попадает в левое поддерево, иначе – в правое.
 
-# gini -степень неоднородности выборки если =0 то неоднородная если =1 однородная
-"""
-samples = 8693: Общее количество примеров в этом узле.
-value = [4315, 4378]: Это количество образцов для каждого класса (в данном случае, скорее всего, True и False).
-class = True: Это класс, который будет назначен, если условия в узле выполняются.
+Gini index (джини) характеризует степень неоднородности узла:
+    samples = 8693: общее количество объектов в узле.
+    value = [4315, 4378]: распределение объектов по классам (например, для классов True и False).
+    class = True: класс, который будет предсказан, если условие узла выполняется.
 """
