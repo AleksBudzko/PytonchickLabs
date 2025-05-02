@@ -12,8 +12,8 @@ except FileNotFoundError:
 
 # Проверяем наличие необходимых колонок
 required_columns = {
-    'features': ['lr_pred', 'linear_pred'],  # ПРИМЕР! Замените на реальные названия
-    'target': 'true_target'  # из вашего файла
+    'features': ['Логистическая регрессия', 'Линейная регрессия'],
+    'target': 'Истинное значение'
 }
 
 print("Доступные колонки в данных:", train.columns.tolist())
