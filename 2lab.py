@@ -81,15 +81,15 @@ cm_linear = confusion_matrix(target_val, pred_linear)
 # Визуализация матриц ошибок с помощью heatmap
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-sns.heatmap(cm_logistic, annot=True, fmt='d', cmap='Greens', ax=axes[0])
-axes[0].set_xlabel('Предсказано: отрицательный')
+sns.heatmap(cm_logistic, annot=True, fmt='d', cmap='Blues', ax=axes[0])
+axes[0].set_xlabel('Предсказано')
 axes[0].set_ylabel('Истинное значение')
-axes[0].set_title('Матрица ошибок: Логистическая регрессия')
+axes[0].set_title('Логистическая регрессия')
 
-sns.heatmap(cm_linear, annot=True, fmt='d', cmap='Reds', ax=axes[1])
-axes[1].set_xlabel('Предсказано: отрицательный')
+sns.heatmap(cm_linear, annot=True, fmt='d', cmap='Greens', ax=axes[1])
+axes[1].set_xlabel('Предсказано')
 axes[1].set_ylabel('Истинное значение')
-axes[1].set_title('Матрица ошибок: Линейная регрессия')
+axes[1].set_title('Линейная регрессия')
 
 plt.tight_layout()
 plt.show()
