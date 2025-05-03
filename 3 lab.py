@@ -69,7 +69,6 @@ plot_tree(decision_tree, filled=True, feature_names=features_train.columns, clas
 plt.show()
 
 """
-Комментарий:
 Условие разделения:
     CryoSleep_True <= 0.5
 означает, что если значение признака CryoSleep_True меньше или равно 0.5, 
