@@ -1,45 +1,55 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score
-from tensorflow import keras
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.neural_network import MLPClassifier
+import matplotlib.pyplot as plt
+from sklearn.exceptions import ConvergenceWarning
+import warnings
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
+np.random.seed(42)
 
-# Шаг 1. Загрузка данных
-X = np.loadtxt('dataIn.txt')
-Y = np.loadtxt('dataOut.txt')
+X = np.random.randint(0, 2, size=(1000, 12))
 
-# Шаг 2. Разделение на обучающую и тестовую выборки
-X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.3, random_state=42)
+Y = np.zeros((1000, 2), dtype=int)
 
-# Шаг 3. Нормализация данных
+random_classes = np.random.randint(0, 2, size=100)
+Y[np.arange(100), random_classes] = 1
+
+np.savetxt('dataIn.txt', X, fmt='%d')
+np.savetxt('dataOut.txt', Y, fmt='%d')
+
+X = np.loadtxt("dataIn.txt")
+Y_onehot = np.loadtxt("dataOut.txt")
+y = np.argmax(Y_onehot, axis=1)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
 
-# Шаг 4. Создание модели MLP с одним скрытым слоем (logsig = sigmoid)
-model = keras.Sequential([
-    keras.layers.Dense(16, activation='sigmoid', input_shape=(12,)),
-    keras.layers.Dense(2, activation='softmax')
-])
+model = MLPClassifier(
+    hidden_layer_sizes=(10,),
+    activation='logistic',
+    solver='adam',
+    max_iter=1000,
+    random_state=42
+)
+model.fit(X_train, y_train)
 
-# Шаг 5. Компиляция модели
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+y_pred = model.predict(X_test)
+print("Accuracy:", accuracy_score(y_test, y_pred))
 
-# Шаг 6. Обучение модели
-history = model.fit(X_train, Y_train, epochs=50, batch_size=16, validation_data=(X_test, Y_test))
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    print("\nОтчет:\n", classification_report(y_test, y_pred, zero_division=0))
 
-# Шаг 7. Оценка модели
-Y_pred = model.predict(X_test)
-Y_pred_classes = np.argmax(Y_pred, axis=1)
-Y_test_classes = np.argmax(Y_test, axis=1)
+plt.plot(model.loss_curve_, color='green', linestyle='--', label='Потери на обучающем наборе')
 
-print("Accuracy:", accuracy_score(Y_test_classes, Y_pred_classes))
-
-# Шаг 8. Визуализация потерь
-plt.plot(history.history['loss'], label='Training Loss')
-plt.plot(history.history['val_loss'], label='Validation Loss')
-plt.xlabel('Epochs')
-plt.ylabel('Loss')
+plt.xlabel('Эпохи')
+plt.ylabel('Потери')
+plt.title('потери на обучающем наборе для многослойного перцептрона')
 plt.legend()
+plt.grid(True)
+plt.tight_layout()
 plt.show()
